@@ -1,0 +1,70 @@
+name: build
+
+on:
+  push:
+    branches: [master]
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  macos-arm64:
+    # macos-14+ runners are Apple Silicon (arm64), which is what "current arm
+    # platforms" means here. Cross-building this from Linux would need Apple's SDK,
+    # whose licence restricts it to Apple hardware, so CI is the honest route.
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: brew install cmake pkgconf openssl@3 flac ffmpeg
+
+      - name: Configure
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DOPENSSL_ROOT_DIR="$(brew --prefix openssl@3)" \
+            -DCMAKE_PREFIX_PATH="$(brew --prefix openssl@3);$(brew --prefix)"
+
+      - name: Build
+        run: cmake --build build -j"$(sysctl -n hw.ncpu)"
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: tidal-connect-ng-macos-arm64
+          path: build/src/tidal-connect-ng
+          if-no-files-found: error
+
+  linux-arm64:
+    # Native arm64 runner with the target distro as the container: the same sonames
+    # the Pi has (libavformat.so.61, libFLAC.so.14, ...) without qemu emulation.
+    runs-on: ubuntu-24.04-arm
+    container: debian:trixie
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            build-essential cmake pkg-config git ca-certificates \
+            libssl-dev libcurl4-openssl-dev \
+            libflac-dev libflac++-dev \
+            libavformat-dev libavcodec-dev libavutil-dev libswresample-dev \
+            libavahi-compat-libdnssd-dev libasound2-dev libpulse-dev
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DTCNG_BUILD_TESTS=OFF
+
+      - name: Build
+        run: cmake --build build -j"$(nproc)"
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: tidal-connect-ng-linux-arm64
+          path: build/src/tidal-connect-ng
+          if-no-files-found: error
