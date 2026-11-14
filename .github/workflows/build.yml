@@ -8,10 +8,10 @@ on:
 
 jobs:
   macos-arm64:
-    # macos-14+ runners are Apple Silicon (arm64), which is what "current arm
-    # platforms" means here. Cross-building this from Linux would need Apple's SDK,
+    # macos-15 is Apple Silicon (arm64); macos-14 was retired on 2026-11-02 and now
+    # cancels at queue time. Cross-building this from Linux would need Apple's SDK,
     # whose licence restricts it to Apple hardware, so CI is the honest route.
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
 
